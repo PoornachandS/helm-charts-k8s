@@ -1,0 +1,99 @@
+name: Create release to hrfp-test
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - action-fix
+  workflow_dispatch:
+
+env:
+  AKS_NAMESPACE: hrfp-non-prod
+  AKS_CLIENT_ID: 332aee7c-51c0-4d86-9e7d-66a704818c65
+  AKS_TENANT_ID: c95a25de-f20a-4216-bc84-99694442c1b5
+  AKS_SUBSCRIPTION_ID: 829236e3-ffca-4a4f-84b0-56002a5e99e0
+  ACR_NAME: nuudaysecurecontact001
+  IMAGE_NAME: nuuday.secure.contact
+  HELM_RELEASE_NAME: hrfp
+  HELM_CHART_NAME: helm
+  
+
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read  # This is required for actions/checkout
+
+jobs:
+  kubectl:
+
+    runs-on: ubuntu-20.04
+    environment: Test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Azure registry login
+      uses: docker/login-action@v3
+      with:
+        registry: nuudaysecurecontact001.azurecr.io
+        username: nuudaysecurecontact001
+        password: ${{secrets.AZURE_IMAGE_REGISTRY}}
+
+    - name: Configure Docker CLI
+      run: |
+          echo "${{ secrets.AZURE_IMAGE_REGISTRY }}" | docker login "${{ env.ACR_NAME }}.azurecr.io" -u "${{ env.ACR_NAME }}" --password-stdin
+
+
+    - name: Pull image from ACR
+      run: |
+        docker pull ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}
+        
+        
+    - name: Get kubelogin
+      run: |
+        curl -LO https://github.com/Azure/kubelogin/releases/download/v0.0.20/kubelogin-linux-amd64.zip
+        sudo unzip -j kubelogin-linux-amd64.zip -d /usr/local/bin
+        rm -f kubelogin-linux-amd64.zip
+        kubelogin --version
+    
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ env.AKS_CLIENT_ID }}
+        tenant-id: ${{ env.AKS_TENANT_ID }}
+        subscription-id: ${{ env.AKS_SUBSCRIPTION_ID }}
+        allow-no-subscriptions: true
+
+    - name: Set KUBECONFIG env variable
+      run: echo "KUBECONFIG=${RUNNER_TEMP}/kubeconfig-$(date +%s)" >> $GITHUB_ENV
+
+    - name: Set AKS cluster context
+      run: |
+          az account show
+          az aks get-credentials --subscription "${{ env.AKS_SUBSCRIPTION_ID }}" --resource-group "managed-aks-non-prod" --name "managednonprod" -f ${KUBECONFIG}
+          kubelogin convert-kubeconfig -l azurecli  # this is required for me because of AAD and Azure RBAC integration
+
+    - name: Create secret in Kubernetes cluster
+      uses: Azure/k8s-create-secret@v3.0
+      with:
+        #Choose the target Kubernetes namespace. If the namespace is not provided, the commands will run in the default namespace.
+        namespace: "hrfp-non-prod"
+        # Type of Kubernetes secret. Defaults to 'kubernetes.io/dockerconfigjson'.
+        # Name of the secret. You can use this secret name in the Kubernetes YAML configuration file.d
+        secret-name: image-pull-secret
+        # Container Registry URL
+        container-registry-url: nuudaysecurecontact001.azurecr.io
+        # Container Registry user name
+        container-registry-username: nuudaysecurecontact001
+        # Container Registry password
+        container-registry-password: ${{ secrets.AZURE_IMAGE_REGISTRY }}
+        
+    - name: Helm Deploy Application
+      run: |
+          helm upgrade --install ${{ env.HELM_RELEASE_NAME }} ./${{ env.HELM_CHART_NAME }} \
+            --namespace ${{ env.AKS_NAMESPACE }} \
+            --set image.repository=${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }} \
+            --set image.tag=signed --debug 
+
+    - name: kubectl get ns
+      run: kubectl get pods -n hrfp-non-prod
