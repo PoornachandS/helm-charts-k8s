@@ -2,50 +2,15 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Values.service.name }}
-  annotations:
-    application_service: "HR-frontpage"
-    spoc: "Shanmathi - shman@nuuday.dk"
-spec:
-  replicas: {{ .Values.service.replicas }}
+  labels:
+    app: nginx
+spec: 
+  type:  {{ .Values.service.type }} 
+  ports:
+    - nodePort: {{ .Values.service.port }}
+      port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
   selector:
-    matchLabels:
-      app: {{ .Values.service.name }}
-  template:
-    metadata:
-      labels:
-        app: {{ .Values.service.name }}
-      annotations:
-        application_service: "HR-frontpage"
-        spoc: "Shanmathi - shman@nuuday.dk"
-    spec:
-      imagePullSecrets:
-      - name: {{ .Values.image.secret }}
-      containers:
-      - name: {{ .Values.service.name }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-        imagePullPolicy: Always
-        resources:
-          limits:
-            sgx.intel.com/epc: "4Gi"
-          requests:
-            sgx.intel.com/epc: "4Gi"
-        volumeMounts:
-        - name: var-run-aesmd
-          mountPath: /var/run/aesmd
-      volumes:
-      - name: var-run-aesmd
-        hostPath:
-          path: /var/run/aesmd
-        #livenessProbe:
-          #httpGet:
-            #path: /health
-            #port: 5000
-          #initialDelaySeconds: 10
-          #periodSeconds: 10
-        ports:
-        - containerPort: 5000
-    
-    {{- with .Values.nodeSelector }}
-    nodeSelector:
-      {{- toYaml . | nindent 8 }}
-    {{- end }}
+    app: nginx
