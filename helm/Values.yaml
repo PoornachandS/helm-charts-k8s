@@ -1,0 +1,11 @@
+deployment:
+  name: challenge
+  image:
+    app: nginx
+    version: latest
+
+service:
+  name: challengesvc
+  type: NodePort
+  nodePort: 31234
+  targetPort: 80
