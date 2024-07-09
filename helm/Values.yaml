@@ -6,6 +6,5 @@ deployment:
 
 service:
   name: challengesvc
-  type: NodePort
-  nodePort: 31234
+  type: LoadBalancer
   targetPort: 80
