@@ -69,7 +69,7 @@ jobs:
           valueFile: 'helm/Values.yaml'
           propertyPath: 'deployment.image.uri'
           value: ${{ steps.image.outputs.image_id }}
-          repository: PoornachandS/helm-chart-k8s
+          repository: poornachandsd/helm-chart-k8s
           branch: ${{ steps.extract_branch.outputs.branch }}
           commitChange: true
           createPR: false
