@@ -1,8 +1,7 @@
 deployment:
   name: challenge
   image:
-    app: nginx
-    version: latest
+    uri: nginx:latest
 
 service:
   name: challengesvc
