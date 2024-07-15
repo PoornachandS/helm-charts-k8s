@@ -9,6 +9,9 @@ on:
       - '.github/**'
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: write
 
 jobs:
   build_docker_image:
