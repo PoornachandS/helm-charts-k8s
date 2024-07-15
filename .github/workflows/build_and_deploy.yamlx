@@ -1,4 +1,4 @@
-name: Create release to hrfp-test
+name: deploy image for nginx app
 
 on:
   push:
